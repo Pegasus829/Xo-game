@@ -264,18 +264,28 @@ h1 {
     }
 }
 
-.reset-btn {
+.button-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    width: 100%;
+}
+
+.reset-btn, .reset-all-btn {
     width: 100%;
     padding: 15px;
     font-size: 1.2rem;
     font-weight: bold;
-    background: var(--accent-primary);
     color: white;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px var(--shadow);
+}
+
+.reset-btn {
+    background: var(--accent-primary);
 }
 
 .reset-btn:hover {
@@ -285,6 +295,20 @@ h1 {
 }
 
 .reset-btn:active {
+    transform: translateY(0);
+}
+
+.reset-all-btn {
+    background: #6c757d;
+}
+
+.reset-all-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px var(--shadow);
+}
+
+.reset-all-btn:active {
     transform: translateY(0);
 }
 
@@ -312,5 +336,10 @@ h1 {
 
     .player-symbol {
         font-size: 2rem;
+    }
+
+    .button-container {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
 }

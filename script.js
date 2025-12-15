@@ -32,6 +32,7 @@ const cells = document.querySelectorAll('.cell');
 const gameStatus = document.getElementById('gameStatus');
 const recommendationEl = document.getElementById('recommendation');
 const resetBtn = document.getElementById('resetBtn');
+const resetAllBtn = document.getElementById('resetAllBtn');
 const themeToggle = document.getElementById('themeToggle');
 const player1NameEl = document.getElementById('player1Name');
 const player2NameEl = document.getElementById('player2Name');
@@ -48,6 +49,7 @@ function init() {
     });
 
     resetBtn.addEventListener('click', resetGame);
+    resetAllBtn.addEventListener('click', resetAll);
     themeToggle.addEventListener('click', toggleTheme);
     editPlayer1Btn.addEventListener('click', () => editPlayerName(1));
     editPlayer2Btn.addEventListener('click', () => editPlayerName(2));
@@ -171,6 +173,37 @@ function resetGame() {
     updateGameStatus();
     hideRecommendation();
     resetInactivityTimer();
+}
+
+// Reset all (scores and names)
+function resetAll() {
+    // Confirm before resetting
+    if (!confirm('Are you sure you want to reset all scores and player names? This cannot be undone.')) {
+        return;
+    }
+
+    // Reset scores
+    scores = {
+        player1: 0,
+        player2: 0,
+        draws: 0
+    };
+
+    // Reset player names
+    player1Name = 'Player 1';
+    player2Name = 'Player 2';
+    player1NameEl.textContent = player1Name;
+    player2NameEl.textContent = player2Name;
+
+    // Update display
+    updateScoreDisplay();
+    updateGameStatus();
+
+    // Clear localStorage
+    localStorage.removeItem('noughtsAndCrossesData');
+
+    // Also reset the game board
+    resetGame();
 }
 
 // Inactivity timer functions
