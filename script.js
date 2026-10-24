@@ -1,3 +1,12 @@
+import {
+    checkDraw,
+    findWinningCombination,
+    getRecommendedMove,
+    parseStoredGame,
+    sanitizeName,
+    sanitizeTheme
+} from './game.js';
+
 // Game state
 let board = ['', '', '', '', '', '', '', '', ''];
 let currentPlayer = 'X';
@@ -14,18 +23,6 @@ let scores = {
 let inactivityTimer = null;
 let lastMoveTime = Date.now();
 const INACTIVITY_THRESHOLD = 10000; // 10 seconds
-
-// Winning combinations
-const winningCombinations = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6]
-];
 
 // DOM elements
 const cells = document.querySelectorAll('.cell');
@@ -54,7 +51,6 @@ function init() {
     editPlayer1Btn.addEventListener('click', () => editPlayerName(1));
     editPlayer2Btn.addEventListener('click', () => editPlayerName(2));
 
-    // Load saved data from localStorage
     loadGameData();
     updateScoreDisplay();
     updateGameStatus();
@@ -63,10 +59,11 @@ function init() {
 
 // Handle cell click
 function handleCellClick(e) {
-    const cell = e.target;
-    const index = parseInt(cell.getAttribute('data-index'));
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    const index = parseInt(cell.getAttribute('data-index'), 10);
 
-    if (board[index] !== '' || !gameActive) {
+    if (Number.isNaN(index) || board[index] !== '' || !gameActive) {
         return;
     }
 
@@ -83,31 +80,16 @@ function makeMove(index) {
     hideRecommendation();
     resetInactivityTimer();
 
-    if (checkWin()) {
+    const winningCombination = findWinningCombination(board);
+    if (winningCombination) {
+        highlightWinningCells(winningCombination);
         handleWin();
-    } else if (checkDraw()) {
+    } else if (checkDraw(board)) {
         handleDraw();
     } else {
         currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
         updateGameStatus();
     }
-}
-
-// Check for win
-function checkWin() {
-    return winningCombinations.some(combination => {
-        const [a, b, c] = combination;
-        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-            highlightWinningCells(combination);
-            return true;
-        }
-        return false;
-    });
-}
-
-// Check for draw
-function checkDraw() {
-    return board.every(cell => cell !== '');
 }
 
 // Highlight winning cells
@@ -154,9 +136,9 @@ function updateGameStatus() {
 
 // Update score display
 function updateScoreDisplay() {
-    player1ScoreEl.textContent = scores.player1;
-    player2ScoreEl.textContent = scores.player2;
-    drawScoreEl.textContent = scores.draws;
+    player1ScoreEl.textContent = String(scores.player1);
+    player2ScoreEl.textContent = String(scores.player2);
+    drawScoreEl.textContent = String(scores.draws);
 }
 
 // Reset game
@@ -177,32 +159,30 @@ function resetGame() {
 
 // Reset all (scores and names)
 function resetAll() {
-    // Confirm before resetting
     if (!confirm('Are you sure you want to reset all scores and player names? This cannot be undone.')) {
         return;
     }
 
-    // Reset scores
     scores = {
         player1: 0,
         player2: 0,
         draws: 0
     };
 
-    // Reset player names
     player1Name = 'Player 1';
     player2Name = 'Player 2';
     player1NameEl.textContent = player1Name;
     player2NameEl.textContent = player2Name;
 
-    // Update display
     updateScoreDisplay();
     updateGameStatus();
 
-    // Clear localStorage
-    localStorage.removeItem('noughtsAndCrossesData');
+    try {
+        localStorage.removeItem('noughtsAndCrossesData');
+    } catch {
+        // Storage can be unavailable. The in-memory reset still stands.
+    }
 
-    // Also reset the game board
     resetGame();
 }
 
@@ -235,7 +215,7 @@ function checkInactivity() {
 
 // Show recommendation
 function showRecommendation() {
-    const recommendedMove = getRecommendedMove();
+    const recommendedMove = getRecommendedMove(board, currentPlayer);
     if (recommendedMove !== -1) {
         const row = Math.floor(recommendedMove / 3) + 1;
         const col = (recommendedMove % 3) + 1;
@@ -247,42 +227,6 @@ function showRecommendation() {
 // Hide recommendation
 function hideRecommendation() {
     recommendationEl.classList.add('hidden');
-}
-
-// Get recommended move (simple AI)
-function getRecommendedMove() {
-    // First, try to win
-    for (let combination of winningCombinations) {
-        const [a, b, c] = combination;
-        if (board[a] === currentPlayer && board[b] === currentPlayer && board[c] === '') return c;
-        if (board[a] === currentPlayer && board[c] === currentPlayer && board[b] === '') return b;
-        if (board[b] === currentPlayer && board[c] === currentPlayer && board[a] === '') return a;
-    }
-
-    // Then, try to block opponent
-    const opponent = currentPlayer === 'X' ? 'O' : 'X';
-    for (let combination of winningCombinations) {
-        const [a, b, c] = combination;
-        if (board[a] === opponent && board[b] === opponent && board[c] === '') return c;
-        if (board[a] === opponent && board[c] === opponent && board[b] === '') return b;
-        if (board[b] === opponent && board[c] === opponent && board[a] === '') return a;
-    }
-
-    // Take center if available
-    if (board[4] === '') return 4;
-
-    // Take corners
-    const corners = [0, 2, 6, 8];
-    for (let corner of corners) {
-        if (board[corner] === '') return corner;
-    }
-
-    // Take any available space
-    for (let i = 0; i < 9; i++) {
-        if (board[i] === '') return i;
-    }
-
-    return -1;
 }
 
 // Edit player name
@@ -301,8 +245,13 @@ function editPlayerName(playerNum) {
     input.focus();
     input.select();
 
+    let saved = false;
     function saveName() {
-        const newName = input.value.trim() || currentName;
+        if (saved) return;
+        saved = true;
+
+        const fallback = playerNum === 1 ? 'Player 1' : 'Player 2';
+        const newName = sanitizeName(input.value, currentName || fallback);
         if (playerNum === 1) {
             player1Name = newName;
             player1NameEl.textContent = newName;
@@ -318,8 +267,9 @@ function editPlayerName(playerNum) {
     }
 
     input.addEventListener('blur', saveName);
-    input.addEventListener('keypress', (e) => {
+    input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            e.preventDefault();
             saveName();
         }
     });
@@ -335,7 +285,11 @@ function toggleTheme() {
     const themeIcon = themeToggle.querySelector('.theme-icon');
     themeIcon.textContent = newTheme === 'light' ? '🌙' : '☀️';
 
-    localStorage.setItem('theme', newTheme);
+    try {
+        localStorage.setItem('theme', newTheme);
+    } catch {
+        // Ignore storage failures. The theme still applies for this visit.
+    }
 }
 
 // Save game data to localStorage
@@ -345,31 +299,38 @@ function saveGameData() {
         player2Name,
         scores
     };
-    localStorage.setItem('noughtsAndCrossesData', JSON.stringify(data));
+    try {
+        localStorage.setItem('noughtsAndCrossesData', JSON.stringify(data));
+    } catch {
+        // Ignore storage failures. The in-memory game still works.
+    }
 }
 
 // Load game data from localStorage
 function loadGameData() {
-    const savedData = localStorage.getItem('noughtsAndCrossesData');
-    if (savedData) {
-        const data = JSON.parse(savedData);
-        player1Name = data.player1Name || 'Player 1';
-        player2Name = data.player2Name || 'Player 2';
-        scores = data.scores || { player1: 0, player2: 0, draws: 0 };
+    let savedData = null;
+    let savedTheme = null;
+    try {
+        savedData = localStorage.getItem('noughtsAndCrossesData');
+        savedTheme = localStorage.getItem('theme');
+    } catch {
+        savedData = null;
+        savedTheme = null;
+    }
 
+    const data = savedData ? parseStoredGame(savedData) : null;
+    if (data) {
+        player1Name = data.player1Name;
+        player2Name = data.player2Name;
+        scores = data.scores;
         player1NameEl.textContent = player1Name;
         player2NameEl.textContent = player2Name;
     }
 
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        document.body.setAttribute('data-theme', savedTheme);
-        const themeIcon = themeToggle.querySelector('.theme-icon');
-        themeIcon.textContent = savedTheme === 'light' ? '🌙' : '☀️';
-    } else {
-        // Default to dark theme
-        document.body.setAttribute('data-theme', 'dark');
-    }
+    const theme = sanitizeTheme(savedTheme);
+    document.body.setAttribute('data-theme', theme);
+    const themeIcon = themeToggle.querySelector('.theme-icon');
+    themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
 }
 
 // Initialize the game when DOM is loaded

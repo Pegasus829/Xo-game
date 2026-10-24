@@ -77,6 +77,15 @@ To run the game locally:
 
 3. Open your browser to `http://localhost:8000`
 
+The browser game has no runtime dependencies. Node is used only to build the Pages bundle and run checks:
+
+```bash
+npm ci
+npm test
+npm run build
+npm audit --audit-level=moderate
+```
+
 ## Technologies Used
 
 - **HTML5**: Semantic markup and structure
@@ -98,11 +107,14 @@ Works in all modern browsers that support:
 Xo-game/
 ├── index.html          # Main HTML structure
 ├── styles.css          # Styling and themes
-├── script.js           # Game logic and interactivity
+├── script.js           # DOM and game interaction
+├── game.js             # Rules and saved-data checks
+├── test/               # Node tests
 ├── .github/
+│   ├── dependabot.yml
 │   └── workflows/
-│       └── deploy.yml  # GitHub Pages deployment
-└── README.md          # This file
+│       └── deploy.yml  # ci check, then GitHub Pages
+└── README.md           # This file
 ```
 
 ## License
